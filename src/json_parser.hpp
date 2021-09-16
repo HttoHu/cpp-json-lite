@@ -44,7 +44,7 @@ public:
 
 private:
     JSON(Parser::Node *n);
-    std::string stringfy_unit(std::string indent, size_t indent_cnt) const;
+    std::string stringify_unit(std::string indent, size_t indent_cnt) const;
     bool child = false;
     Parser::Node *node;
 };

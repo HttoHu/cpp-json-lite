@@ -578,7 +578,7 @@ namespace
 
 }
 
-std::string JSON::stringfy_unit(std::string indent, size_t indent_cnt) const
+std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
 {
     if (get_type() == JSON::INT)
         return std::to_string(get_int());
@@ -596,7 +596,7 @@ std::string JSON::stringfy_unit(std::string indent, size_t indent_cnt) const
         auto &vec = static_cast<Parser::Array *>(node)->elements;
         for (size_t i = 0; i < vec.size(); i++)
         {
-            ret += indent_prefix + indent + JSON(vec[i]).stringfy_unit(indent, indent_cnt + 1);
+            ret += indent_prefix + indent + JSON(vec[i]).stringify_unit(indent, indent_cnt + 1);
             if (i != vec.size() - 1)
             {
                 ret += ",";
@@ -613,7 +613,7 @@ std::string JSON::stringfy_unit(std::string indent, size_t indent_cnt) const
         size_t idx = 0;
         for (auto pair : mp)
         {
-            ret += indent_prefix + indent + "\"" + pair.first + "\": " + JSON(pair.second).stringfy_unit(indent, indent_cnt + 1);
+            ret += indent_prefix + indent + "\"" + pair.first + "\": " + JSON(pair.second).stringify_unit(indent, indent_cnt + 1);
             if (++idx != mp.size())
                 ret += ",\n";
             else
@@ -627,7 +627,7 @@ std::string JSON::stringfy_unit(std::string indent, size_t indent_cnt) const
 
 std::string JSON::to_string(std::string indent) const
 {
-    return stringfy_unit(indent, 0);
+    return stringify_unit(indent, 0);
 }
 JSON::~JSON()
 {
