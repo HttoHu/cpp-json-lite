@@ -8,7 +8,7 @@ C++ 11 or later is required.
 
 #### Create 
 ```cpp
-JSON json(std::string str); // it will jsonfy the str.
+JSON json(std::string str); // it will jsonify the str.
 ```
 #### Visit
 * get int value by JSON::get_int();
