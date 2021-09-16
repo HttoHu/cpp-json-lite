@@ -46,7 +46,7 @@ size_t count() const;
 size_t length() const;
 ```
 
-#### Stringfy
+#### to_string
 ```cpp
 std::string to_string(std::string indent);
 ```
