@@ -147,6 +147,7 @@ namespace Lexer
         std::vector<Token *> tokens;
         int cur_p = 0;
     };
+
     TokenStream build_token_stream(const std::string &str);
 }
 namespace Parser
@@ -482,14 +483,29 @@ JSON::JSON(const std::string &str) : child(false)
     node = Parser::parse_unit(ts);
 }
 JSON::JSON(Parser::Node *n) : child(true), node(n) {}
-JSON::JSON(const JSON &rhs) : child(true), node(rhs.node) {}
+JSON::JSON(const JSON &rhs) : child(rhs.child), node(rhs.node)
+{
+    rhs.child = true;
+}
+JSON::JSON(JSON &&rhs) : child(rhs.child), node(rhs.node)
+{
+    rhs.child = true;
+}
+
 JSON &JSON::operator=(const JSON &rhs)
 {
-    child = true;
+    child = rhs.child;
+    rhs.child = true;
     node = rhs.node;
     return *this;
 }
-
+JSON &JSON::operator=(JSON &&rhs)
+{
+    child = rhs.child;
+    rhs.child = true;
+    node = rhs.node;
+    return *this;
+}
 JSON::JSONTYPE JSON::get_type() const
 {
     return (JSONTYPE)node->get_type();
@@ -535,6 +551,28 @@ JSON JSON::operator[](const std::string &str)
 JSON JSON::operator[](size_t idx)
 {
     return JSON(node->operator[](idx));
+}
+
+void JSON::add_pair(const std::string &str, JSON json)
+{
+    json.child = true;
+    if (get_type() != JSON::GROUP)
+        throw std::runtime_error("JSON::add_pair type not matched expected a map");
+
+    static_cast<Parser::Group *>(node)->member_table.insert({str, json.node});
+}
+void JSON::push(JSON json)
+{
+    json.child = true;
+    if (get_type() != JSON::ARRAY)
+        throw std::runtime_error("JSON::push type not matched expected an array");
+
+    static_cast<Parser::Array *>(node)->elements.push_back(json.node);
+}
+
+JSON JSON::clone() const
+{
+    return JSON(to_string());
 }
 size_t JSON::count() const
 {
@@ -633,5 +671,40 @@ JSON::~JSON()
 {
     if (!child)
         delete node;
+}
+
+// build json
+JSON JSON::val(int val)
+{
+    return JSON(std::to_string(val));
+}
+
+JSON JSON::val(const std::string &str)
+{
+    return JSON("\"" + str + "\"");
+}
+JSON JSON::array(const std::vector<JSON> &vec)
+{
+    //vector<JSON> -> vector<Node*>
+    std::vector<Parser::Node *> tmp;
+    for (auto item : vec)
+    {
+        item.child = true;
+        tmp.push_back(item.node);
+    }
+    Parser::Array *node = new Parser::Array(tmp);
+    return JSON(false, node);
+}
+JSON JSON::map(const std::map<std::string, JSON> &table)
+{
+    //vector<JSON> -> vector<Node*>
+    std::map<std::string, Parser::Node *> tmp;
+    for (auto item : table)
+    {
+        item.second.child = true;
+        tmp.insert({item.first, item.second.node});
+    }
+    Parser::Group *node = new Parser::Group(tmp);
+    return JSON(false, node);
 }
 //             end ===== JSON defination ======
