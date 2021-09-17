@@ -604,7 +604,7 @@ namespace
                 ret += "\\t";
                 break;
             case '\\':
-                ret += "\\";
+                ret += "\\\\";
                 break;
             default:
                 ret += ch;
