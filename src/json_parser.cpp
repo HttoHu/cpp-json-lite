@@ -109,8 +109,11 @@ namespace Lexer
         void push(Token *tok) { tokens.push_back(tok); }
         Token *current()
         {
+
             if (cur_p >= tokens.size())
                 throw std::runtime_error("TokenStream::current out of range");
+            while (cur_p < tokens.size() && tokens[cur_p]->get_tag() == Tag::END_LINE)
+                cur_p++;
             return tokens[cur_p];
         }
 
@@ -121,8 +124,9 @@ namespace Lexer
 
         void match(Tag tag)
         {
-            auto cur = current();
-            if (cur->get_tag() == tag)
+            while (get_cur_tag() == Tag::END_LINE)
+                cur_p++;
+            if (get_cur_tag() == tag)
             {
                 cur_p++;
                 return;
