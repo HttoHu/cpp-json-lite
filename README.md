@@ -6,10 +6,10 @@ C++ 11 or later is required.
 
 ## Usage
 
-**Take care of copy a json object, because when you copy A to B, A should not use any more**
+**Be careful when copying a JSON object, because when you copy A to B, A should no longer be used**
 ```cpp
-JSON A=B; // JSON is an object
-A.add_pair("GOOD",B); // BOOM!!!! the node insided delete twice 
+JSON A=B; 
+A.add_pair("GOOD",B); // BOOM!!!! The node object inside has been deleted twice
 ```cpp
 A.add_pair("GOOD",B.clone()); // Okay
 ```
@@ -107,4 +107,4 @@ example
 
 
 ### About author
-HttoHu or 胡远韬 2021
+Htto Hu or 胡远韬 2021
