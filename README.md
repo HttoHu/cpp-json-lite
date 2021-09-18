@@ -19,7 +19,7 @@ A.add_pair("Self",A); // BOOM
 A.add_pair("Self",A.clone()); // Okay
 ```
 
-#### Create 
+#### Create or Clone
 
 ```cpp
 JSON json(std::string str); // it will jsonify the str.
@@ -27,6 +27,7 @@ JSON::clone(); // clone a json object
 ```
 
 #### Visit
+
 * get int value by JSON::get_int();
 ```cpp
 int val=json.get_int();
@@ -86,7 +87,7 @@ e.g.
     arr_json.push(json.clone());
 ```
 
-#### build json
+#### Build json by value
 ```cpp
 static JSON val(int val);
 static JSON val(const std::string &str);
@@ -106,5 +107,5 @@ example
 
 
 
-### About author
+### About the author
 Htto Hu or 胡远韬 2021
