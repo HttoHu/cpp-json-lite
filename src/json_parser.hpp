@@ -15,9 +15,10 @@ public:
         STRING = 1,
         INT = 2,
         ARRAY = 3,
-        GROUP = 4
+        GROUP = 4,
+        RAW
     };
-
+    JSON();
     JSON(const std::string &str);
 
     JSON(const JSON &rhs);
@@ -30,6 +31,8 @@ public:
 
     int64_t get_int() const;
     std::string get_str() const;
+    std::vector<unsigned char> &get_raw() const;
+
     std::map<std::string, JSON> get_map() const;
     std::vector<JSON> get_list() const;
 
@@ -47,14 +50,19 @@ public:
     size_t length() const;
 
     std::string to_string(std::string indent = "    ") const;
-
     ~JSON();
+
+    static JSON raw(const std::vector<unsigned char> &vec);
+    static JSON raw(std::vector<unsigned char> &&vec);
     static JSON val(int val);
     static JSON val(const std::string &str);
     static JSON map(const std::map<std::string, JSON> &table);
     static JSON array(const std::vector<JSON> &vec);
 
 private:
+    friend JSON raw(const std::vector<unsigned char> &vec);
+    friend JSON raw(std::vector<unsigned char> &&vec);
+
     JSON(bool _child, Parser::Node *n) : child(_child), node(n) {}
     JSON(Parser::Node *n);
     std::string stringify_unit(std::string indent, size_t indent_cnt) const;

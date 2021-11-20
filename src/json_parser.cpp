@@ -14,8 +14,12 @@ namespace Lexer
         END,
         INTEGER,
         STRING,
+        RAW_DATA,
         LSB,
         RSB,
+        LPAR,
+        RPAR,
+        DOLLAR,
         COMMA,
         COLON,
         END_LINE,
@@ -96,6 +100,23 @@ namespace Lexer
         }
     };
 
+    class RawData : public Token
+    {
+    public:
+        RawData(const std::vector<unsigned char> &dat) : Token(RAW_DATA), data(dat) {}
+        RawData(std::vector<unsigned char> &&dat) : Token(RAW_DATA), data(std::move(dat)) {}
+        static std::vector<unsigned char> get_raw_data(Token *tok)
+        {
+            return static_cast<RawData *>(tok)->data;
+        }
+        std::string to_string() const override
+        {
+            return "<raw:" + std::to_string(data.size()) + " bytes>";
+        }
+
+    private:
+        std::vector<unsigned char> data;
+    };
     class TokenStream
     {
     public:
@@ -152,7 +173,7 @@ namespace Lexer
         int cur_p = 0;
     };
 
-    TokenStream build_token_stream(const std::string &str);
+    TokenStream *build_token_stream(const std::string &str);
 }
 namespace Parser
 {
@@ -163,7 +184,8 @@ namespace Parser
         STRING = 1,
         INT = 2,
         ARRAY = 3,
-        GROUP = 4
+        GROUP = 4,
+        RAW = 5
     };
     class Node
     {
@@ -171,6 +193,7 @@ namespace Parser
         Node(NodeType nt);
         int get_int();
         std::string get_str();
+        std::vector<unsigned char> &get_raw();
         Node *at(const std::string &str)
         {
             return operator[](str);
@@ -227,40 +250,93 @@ namespace Parser
         friend class ::JSON;
         std::vector<Node *> elements;
     };
+    // extend json. (length)$raw_data$
+    class Bytes : public Node
+    {
+    public:
+        Bytes(const std::vector<unsigned char> &tmp) : Node(RAW), data(tmp) {}
+        Bytes(std::vector<unsigned char> &&tmp) : Node(RAW), data(std::move(tmp)) {}
+        size_t raw_length() const
+        {
+            return data.size();
+        }
+        static std::vector<unsigned char> &get_bytes(Node *node)
+        {
+            return static_cast<Bytes *>(node)->data;
+        }
+
+    private:
+        std::vector<unsigned char> data;
+    };
 }
 
 namespace Lexer
 {
 
     std::map<Tag, std::string> tag_to_string{
-        {BEGIN, "{"}, {END, "}"}, {LSB, "["}, {RSB, "]"}, {COMMA, ","}, {COLON, ":"}, {END_TAG, "EOF"}
-
-    };
+        {BEGIN, "{"}, {END, "}"}, {LSB, "["}, {RSB, "]"}, {COMMA, ","}, {COLON, ":"}, {END_TAG, "EOF"}, {LPAR, "("}, {RPAR, ")"}, {DOLLAR, "$"}};
 
     std::map<std::string, Tag> string_to_tag{
-        {"{", BEGIN}, {"}", END}, {"[", LSB}, {"]", RSB}, {",", COMMA}, {":", COLON}};
+        {"{", BEGIN}, {"}", END}, {"[", LSB}, {"]", RSB}, {",", COMMA}, {":", COLON}, {"(", LPAR}, {")", RPAR}, {"$", DOLLAR}};
     // number or string
-    TokenStream build_token_stream(const std::string &str)
+    long long get_number(const std::string &str, int &i)
     {
-        TokenStream token_stream;
+        long long v = str[i] - '0';
+        i++;
+        while (i < str.size() && isdigit(str[i]))
+        {
+            v *= 10;
+            v += str[i] - '0';
+            i++;
+        }
+        i--;
+        return v;
+    }
+    RawData *get_raw_data(const std::string &str, int &i)
+    {
+        // skip (
+        i++;
+        int len = 0;
+        while (i + len < str.size() && str[i + len] != ')')
+            len++;
+        if (i + len >= str.size())
+            throw std::runtime_error("invalid raw_data format! use (length)$raw_content$ to define a raw data");
+
+        int sz = std::stoi(str.substr(i, len));
+        // skip )
+        i += len + 1;
+        if (str[i] != '$')
+            throw std::runtime_error("invalid raw_data format expected a $!");
+        // skip $
+        i++;
+        if (i + sz >= str.size())
+            throw std::runtime_error("invalid raw_data format may be loss right $? ");
+        // raw_data;
+        std::string tmp_str = str.substr(i, sz);
+
+        std::vector<unsigned char> vec(tmp_str.begin(), tmp_str.end());
+        // skip raw_data
+        i += sz;
+        if (i >= str.size() || str[i] != '$')
+            throw std::runtime_error("invalid raw_data format may be loss right $!");
+        return new RawData(std::move(vec));
+    }
+    TokenStream *build_token_stream(const std::string &str)
+    {
+        TokenStream *token_stream = new TokenStream();
         for (int i = 0; i < str.size(); i++)
         {
             char ch = str[i];
             if (isdigit(ch))
             {
-                long long v = ch - '0';
-                i++;
-                while (i < str.size() && isdigit(str[i]))
-                {
-                    v *= 10;
-                    v += str[i] - '0';
-                    i++;
-                }
-                token_stream.push(new Integer(v));
-                i--;
+                token_stream->push(new Integer(get_number(str, i)));
                 continue;
             }
-
+            else if (ch == '(')
+            {
+                token_stream->push(get_raw_data(str, i));
+                continue;
+            }
             if (ch == '\"')
             {
                 std::string v;
@@ -296,7 +372,7 @@ namespace Lexer
                         v += str[i];
                     i++;
                 }
-                token_stream.push(new StringToken(v));
+                token_stream->push(new StringToken(v));
                 continue;
             }
 
@@ -308,20 +384,21 @@ namespace Lexer
             case '}':
             case ':':
             case ',':
-                token_stream.push(new Token(string_to_tag[std::string(1, ch)]));
+                token_stream->push(new Token(string_to_tag[std::string(1, ch)]));
                 break;
             case '\r':
             case '\n':
-                token_stream.push(new EndLine());
+                token_stream->push(new EndLine());
                 break;
             default:
                 break;
             }
         }
-        token_stream.push(new Token(END_TAG));
+        token_stream->push(new Token(END_TAG));
         return token_stream;
     }
 }
+
 namespace Parser
 {
     // Node
@@ -334,6 +411,17 @@ namespace Parser
         }
         else
             throw std::runtime_error("type not matched");
+    }
+    std::vector<unsigned char>& Node::get_raw()
+    {
+        if (type == RAW)
+        {
+            return Bytes::get_bytes(this);
+        }
+        else
+        {
+            throw std::runtime_error("type not matched excepted a bytes");
+        }
     }
     std::string Node::get_str()
     {
@@ -452,6 +540,14 @@ namespace Parser
     {
         switch (ts.get_cur_tag())
         {
+        case Lexer::RAW_DATA:
+        {
+            std::vector<unsigned char> &&v = std::move(Lexer::RawData::get_raw_data(ts.current()));
+
+            ts.match(Lexer::RAW_DATA);
+
+            return (Node *)(new Bytes(std::move(v)));
+        }
         case Lexer::INTEGER:
         {
             auto v = Lexer::Integer::get_content(ts.current());
@@ -481,10 +577,15 @@ namespace Parser
 }
 
 //              ===== JSON defination ======
+JSON::JSON() : child(true), node(nullptr)
+{
+}
+
 JSON::JSON(const std::string &str) : child(false)
 {
     auto ts = Lexer::build_token_stream(str);
-    node = Parser::parse_unit(ts);
+    node = Parser::parse_unit(*ts);
+    delete ts;
 }
 JSON::JSON(Parser::Node *n) : child(true), node(n) {}
 JSON::JSON(const JSON &rhs) : child(rhs.child), node(rhs.node)
@@ -522,7 +623,10 @@ std::string JSON::get_str() const
 {
     return node->get_str();
 }
-
+std::vector<unsigned char> &JSON::get_raw() const
+{
+    return node->get_raw();
+}
 std::map<std::string, JSON> JSON::get_map() const
 {
     if (node->get_type() != Parser::GROUP)
@@ -626,7 +730,11 @@ std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
         return std::to_string(get_int());
     else if (get_type() == JSON::STRING)
         return "\"" + conv_str(get_str()) + "\"";
-
+    else if (get_type() == JSON::RAW)
+    {
+        auto cur = static_cast<Parser::Bytes *>(node);
+        return "(" + std::to_string(cur->raw_length()) + ")$" + std::string(cur->get_raw().begin(), cur->get_raw().end()) + "$";
+    }
     std::string indent_prefix;
     indent_prefix.reserve(indent_cnt * indent.size());
     for (int i = 1; i <= indent_cnt; i++)
@@ -677,12 +785,29 @@ JSON::~JSON()
         delete node;
 }
 
+JSON raw(const std::vector<unsigned char> &vec)
+{
+    JSON ret;
+    //
+    ret.child = false;
+    ret.node = new Parser::Bytes(vec);
+
+    return ret;
+}
+JSON raw(std::vector<unsigned char> &&vec)
+{
+    JSON ret;
+    //
+    ret.child = false;
+    ret.node = new Parser::Bytes(std::move(vec));
+
+    return ret;
+}
 // build json
 JSON JSON::val(int val)
 {
     return JSON(std::to_string(val));
 }
-
 JSON JSON::val(const std::string &str)
 {
     return JSON("\"" + str + "\"");
