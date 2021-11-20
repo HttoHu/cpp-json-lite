@@ -576,7 +576,7 @@ namespace Parser
 }
 
 //              ===== JSON defination ======
-JSON::JSON() : child(true), node(nullptr)
+JSON::JSON() : JSON("{}")
 {
 }
 
@@ -724,7 +724,7 @@ namespace
 
 }
 
-std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
+std::string JSON::stringify_unit(std::string indent, size_t indent_cnt, bool hide_raw) const
 {
     if (get_type() == JSON::INT)
         return std::to_string(get_int());
@@ -733,6 +733,8 @@ std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
     else if (get_type() == JSON::RAW)
     {
         auto cur = static_cast<Parser::Bytes *>(node);
+        if (hide_raw)
+            return "(raw-data:" + std::to_string(cur->raw_length()) + " Bytes)";
         return "(" + std::to_string(cur->raw_length()) + ")$" + std::string(cur->get_raw().begin(), cur->get_raw().end()) + "$";
     }
     std::string indent_prefix;
@@ -746,7 +748,7 @@ std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
         auto &vec = static_cast<Parser::Array *>(node)->elements;
         for (size_t i = 0; i < vec.size(); i++)
         {
-            ret += indent_prefix + indent + JSON(vec[i]).stringify_unit(indent, indent_cnt + 1);
+            ret += indent_prefix + indent + JSON(vec[i]).stringify_unit(indent, indent_cnt + 1, hide_raw);
             if (i != vec.size() - 1)
             {
                 ret += ",";
@@ -763,7 +765,7 @@ std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
         size_t idx = 0;
         for (auto pair : mp)
         {
-            ret += indent_prefix + indent + "\"" + pair.first + "\": " + JSON(pair.second).stringify_unit(indent, indent_cnt + 1);
+            ret += indent_prefix + indent + "\"" + pair.first + "\": " + JSON(pair.second).stringify_unit(indent, indent_cnt + 1, hide_raw);
             if (++idx != mp.size())
                 ret += ",\n";
             else
@@ -777,15 +779,21 @@ std::string JSON::stringify_unit(std::string indent, size_t indent_cnt) const
 
 std::string JSON::to_string(std::string indent) const
 {
-    return stringify_unit(indent, 0);
+    return stringify_unit(indent, 0, true);
 }
+
+std::string JSON::view(std::string indent) const
+{
+    return stringify_unit(indent, 0, true);
+}
+
 JSON::~JSON()
 {
     if (!child)
         delete node;
 }
 
-JSON raw(const std::vector<unsigned char> &vec)
+JSON JSON::raw(const std::vector<unsigned char> &vec)
 {
     JSON ret;
     //
@@ -794,7 +802,7 @@ JSON raw(const std::vector<unsigned char> &vec)
 
     return ret;
 }
-JSON raw(std::vector<unsigned char> &&vec)
+JSON JSON::raw(std::vector<unsigned char> &&vec)
 {
     JSON ret;
     //
@@ -835,5 +843,24 @@ JSON JSON::map(const std::map<std::string, JSON> &table)
     }
     Parser::Group *node = new Parser::Group(tmp);
     return JSON(false, node);
+}
+JSON JSON::read_from_file(const std::string &filename)
+{
+    std::ifstream ifs(filename, std::ios::in | std::ios::binary);
+    if (!ifs)
+        throw std::runtime_error("open file " + filename + " failed\n");
+    char *file_content;
+    ifs.seekg(0, std::ios::end);
+    size_t file_length = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+
+    file_content = new char[file_length];
+
+    ifs.read(file_content, file_length);
+    ifs.close();
+
+    std::string str(file_content, file_content + file_length);
+    delete[] file_content;
+    return JSON(str);
 }
 //             end ===== JSON defination ======

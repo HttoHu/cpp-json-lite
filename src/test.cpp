@@ -267,11 +267,7 @@ namespace Parser
 
 int main()
 {
-    std::string str = "(5)$";
-    str.push_back(0xFF);
-    str.push_back(0);
-    str+="GGG$";
-    JSON js(str);
-    std::cout << js.to_string() << std::endl;
+    JSON js=JSON::read_from_file("test.json");
+    std::cout << js.view() << std::endl;
     return 0;
 }

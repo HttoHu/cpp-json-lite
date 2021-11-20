@@ -67,6 +67,7 @@ size_t length() const;
 ```cpp
 std::string to_string(std::string indent);
 ```
+
 #### Add elements
 ```cpp
 // for map
@@ -106,6 +107,34 @@ example
 ```
 
 
+
+
+#### Extend grammar
+If you want to append some raw-bytes (like pictures or some binary files), you can build your json as follows.
+
+(byte-length)$raw_contenst$
+
+```json
+{
+    "picture":(512)$the binary content of the picture$
+}
+```
+here are some methods;
+
+1. create raw object
+```cpp
+static JSON raw(const std::vector<unsigned char> &vec);
+static JSON raw(std::vector<unsigned char> &&vec);
+```
+2. get raw object 
+```cpp
+std::vector<unsigned char> &get_raw() const;
+```
+
+3. if you want to output the json without raw content you can call view(), view is similar to to_string, but it replaces the raw data with its length.
+```cpp
+std::string view(std::string indent = "    ") const;
+```
 
 ### About the author
 Htto Hu or 胡远韬 2021

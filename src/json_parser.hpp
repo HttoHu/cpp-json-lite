@@ -48,10 +48,11 @@ public:
     size_t count() const;
     // for list
     size_t length() const;
-
+    std::string view(std::string indent = "    ") const;
     std::string to_string(std::string indent = "    ") const;
     ~JSON();
 
+    static JSON read_from_file(const std::string &filename);
     static JSON raw(const std::vector<unsigned char> &vec);
     static JSON raw(std::vector<unsigned char> &&vec);
     static JSON val(int val);
@@ -65,7 +66,7 @@ private:
 
     JSON(bool _child, Parser::Node *n) : child(_child), node(n) {}
     JSON(Parser::Node *n);
-    std::string stringify_unit(std::string indent, size_t indent_cnt) const;
+    std::string stringify_unit(std::string indent, size_t indent_cnt, bool hide_raw) const;
     mutable bool child = false;
     Parser::Node *node;
 };
