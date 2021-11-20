@@ -1,4 +1,5 @@
 #include "json_parser.hpp"
+#include <fstream>
 namespace Lexer
 {
     enum Tag
@@ -96,9 +97,9 @@ namespace Lexer
     class RawData : public Token
     {
     public:
-        RawData(const std::vector<char> &dat) : Token(RAW_DATA), data(dat) {}
-        RawData(std::vector<char> &&dat) : Token(RAW_DATA), data(std::move(data)) {}
-        static std::vector<char> get_raw_data(Token *tok)
+        RawData(const std::vector<unsigned char> &dat) : Token(RAW_DATA), data(dat) {}
+        RawData(std::vector<unsigned char> &&dat) : Token(RAW_DATA), data(std::move(dat)) {}
+        static std::vector<unsigned char> get_raw_data(Token *tok)
         {
             return static_cast<RawData *>(tok)->data;
         }
@@ -108,9 +109,8 @@ namespace Lexer
         }
 
     private:
-        std::vector<char> data;
+        std::vector<unsigned char> data;
     };
-
     class TokenStream
     {
     public:
@@ -168,47 +168,110 @@ namespace Lexer
     };
 
     TokenStream *build_token_stream(const std::string &str);
-
-    RawData *get_raw_data(const std::string &str, int &i);
 }
-
-namespace Test
+namespace Parser
 {
-    namespace Lex
+    // Header
+    // statement
+    enum NodeType
     {
-        bool test_raw_data()
+        STRING = 1,
+        INT = 2,
+        ARRAY = 3,
+        GROUP = 4,
+        RAW = 5
+    };
+    class Node
+    {
+    public:
+        Node(NodeType nt);
+        int get_int();
+        std::string get_str();
+        std::vector<unsigned char> &get_raw();
+        Node *at(const std::string &str)
         {
-
-            std::string test1 = "(5)$12345$";
-            int i = 0;
-            Lexer::RawData *c = Lexer::get_raw_data(test1, i);
-            auto vec = Lexer::RawData::get_raw_data(c);
-            for (auto item : vec)
-            {
-                printf("%02X ", item);
-            }
-            bool flag = true;
-            flag &= vec.size() == 5;
-            test1 = "(5)$";
-            test1.push_back(0xFF);
-            for (int i = 1; i <= 4; i++)
-                test1.push_back(0);
-            test1 += '$';
-            delete c;
-            i = 0;
-            c = Lexer::get_raw_data(test1, i);
-            vec = Lexer::RawData::get_raw_data(c);
-            for (auto item : vec)
-            {
-                printf("%02X ", (unsigned char)item);
-            }
-
-            return true;
+            return operator[](str);
         }
-    }
+        Node *at(size_t idx)
+        {
+            return operator[](idx);
+        }
+        Node *operator[](const std::string &str);
+        Node *operator[](size_t idx);
+
+        NodeType get_type() const { return type; }
+        virtual ~Node();
+
+    private:
+        NodeType type;
+    };
+
+    class Unit : public Node
+    {
+    public:
+        Unit(const std::string &str) : Node(STRING), is_number(false), text(str) {}
+        Unit(int64_t v) : Node(INT), is_number(true), integer(v) {}
+        static int64_t get_integer(Node *node);
+        static std::string get_str(Node *node);
+        ~Unit(){};
+
+    private:
+        bool is_number;
+        std::string text;
+        int64_t integer;
+    };
+    class Group : public Node
+    {
+    public:
+        Group(const std::map<std::string, Node *> &tab);
+        Node *operator[](const std::string &str) const;
+        ~Group();
+        size_t count() const;
+
+    private:
+        friend class ::JSON;
+        std::map<std::string, Node *> member_table;
+    };
+    class Array : public Node
+    {
+    public:
+        Array(const std::vector<Node *> &ele);
+        Node *operator[](size_t idx) const;
+        ~Array();
+        size_t length() const;
+
+    private:
+        friend class ::JSON;
+        std::vector<Node *> elements;
+    };
+    // extend json. (length)$raw_data$
+    class Bytes : public Node
+    {
+    public:
+        Bytes(const std::vector<unsigned char> &tmp) : Node(RAW), data(tmp) {}
+        Bytes(std::vector<unsigned char> &&tmp) : Node(RAW), data(std::move(tmp)) {}
+        size_t raw_length() const
+        {
+            return data.size();
+        }
+        static std::vector<unsigned char> &get_bytes(Node *node)
+        {
+            return static_cast<Bytes *>(node)->data;
+        }
+
+    private:
+        std::vector<unsigned char> data;
+    };
+    Node *parse_unit(Lexer::TokenStream &token_stream);
 }
 
 int main()
 {
-    Test::Lex::test_raw_data();
+    std::string str = "(5)$";
+    str.push_back(0xFF);
+    str.push_back(0);
+    str+="GGG$";
+    JSON js(str);
+    std::cout << js.to_string() << std::endl;
+    return 0;
 }

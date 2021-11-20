@@ -412,7 +412,7 @@ namespace Parser
         else
             throw std::runtime_error("type not matched");
     }
-    std::vector<unsigned char>& Node::get_raw()
+    std::vector<unsigned char> &Node::get_raw()
     {
         if (type == RAW)
         {
@@ -542,8 +542,7 @@ namespace Parser
         {
         case Lexer::RAW_DATA:
         {
-            std::vector<unsigned char> &&v = std::move(Lexer::RawData::get_raw_data(ts.current()));
-
+            std::vector<unsigned char> &&v = Lexer::RawData::get_raw_data(ts.current());
             ts.match(Lexer::RAW_DATA);
 
             return (Node *)(new Bytes(std::move(v)));
@@ -585,6 +584,7 @@ JSON::JSON(const std::string &str) : child(false)
 {
     auto ts = Lexer::build_token_stream(str);
     node = Parser::parse_unit(*ts);
+
     delete ts;
 }
 JSON::JSON(Parser::Node *n) : child(true), node(n) {}
