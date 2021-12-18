@@ -6,6 +6,48 @@
 #include <fstream>
 #include <cstring>
 #include "json_parser.hpp"
+namespace
+{
+    std::string conv_str(const std::string &str)
+    {
+        std::string ret;
+        for (auto ch : str)
+        {
+            switch (ch)
+            {
+            case '\r':
+                ret += "\\r";
+            case '\n':
+                ret += "\\n";
+                break;
+            case '\t':
+                ret += "\\t";
+                break;
+            case '\\':
+                ret += "\\\\";
+                break;
+            default:
+                ret += ch;
+                break;
+            }
+        }
+        return ret;
+    }
+    int get_char_size(unsigned char ch)
+    {
+        unsigned char header = ch >> 4;
+        int len = 0;
+        if ((header >> 3 & 1) == 0)
+            return 1;
+        for (int k = 3; k >= 1; k--)
+        {
+            if (header >> k & 1)
+                len++;
+        }
+        return len;
+    }
+}
+// interface
 namespace Lexer
 {
     enum Tag
@@ -269,7 +311,7 @@ namespace Parser
         std::vector<unsigned char> data;
     };
 }
-
+// implementation
 namespace Lexer
 {
 
@@ -343,34 +385,51 @@ namespace Lexer
                 i++;
                 while (i < str.size() && str[i] != '\"')
                 {
-                    if (str[i] == '\\')
+                    // process UTF8;
+                    int len = get_char_size(str[i]);
+                    if (len == 1)
                     {
-                        if (i + 1 >= str.size())
-                            throw std::runtime_error("build_token_stream: invalid string");
-                        i++;
-                        switch (str[i])
+                        if (str[i] == '\\')
                         {
-                        case 'r':
-                            v += '\r';
-                            break;
-                        case 'n':
-                            v += '\n';
-                            break;
-                        case 't':
-                            v += '\t';
-                            break;
-                        case '\\':
-                        case '\"':
-                        case '\'':
-                            v += str[i];
-                            break;
-                        default:
-                            throw std::runtime_error("build_token_stream: invalid string");
+                            if (i + 1 >= str.size())
+                                throw std::runtime_error("build_token_stream: invalid string");
+                            i++;
+                            switch (str[i])
+                            {
+                            case 'r':
+                                v += '\r';
+                                break;
+                            case 'n':
+                                v += '\n';
+                                break;
+                            case 't':
+                                v += '\t';
+                                break;
+                            case '\\':
+                            case '\"':
+                            case '\'':
+                                v += str[i];
+                                break;
+                            default:
+                                throw std::runtime_error("build_token_stream: invalid string");
+                            }
                         }
+                        else
+                            v += str[i];
+                        i++;
                     }
                     else
-                        v += str[i];
-                    i++;
+                    {
+                        for (int k = 0; k < len; k++, i++)
+                        {
+                            v += str[i];
+
+                            if (i >= str.size())
+                            {
+                                throw std::runtime_error("Lexer Error: invalid UTF8 string\n");
+                            }
+                        }
+                    }
                 }
                 token_stream->push(new StringToken(v));
                 continue;
@@ -398,7 +457,6 @@ namespace Lexer
         return token_stream;
     }
 }
-
 namespace Parser
 {
     // Node
@@ -575,11 +633,11 @@ namespace Parser
     }
 }
 
-//              ===== JSON defination ======
+//              ===== JSON implementation ======
+// constructor
 JSON::JSON() : JSON("{}")
 {
 }
-
 JSON::JSON(const std::string &str) : child(false)
 {
     auto ts = Lexer::build_token_stream(str);
@@ -611,6 +669,7 @@ JSON &JSON::operator=(JSON &&rhs)
     node = rhs.node;
     return *this;
 }
+
 JSON::JSONTYPE JSON::get_type() const
 {
     return (JSONTYPE)node->get_type();
@@ -693,35 +752,6 @@ size_t JSON::length() const
     if (node->get_type() == Parser::ARRAY)
         return static_cast<Parser::Array *>(node)->length();
     return 0;
-}
-namespace
-{
-    std::string conv_str(const std::string &str)
-    {
-        std::string ret;
-        for (auto ch : str)
-        {
-            switch (ch)
-            {
-            case '\r':
-                ret += "\\r";
-            case '\n':
-                ret += "\\n";
-                break;
-            case '\t':
-                ret += "\\t";
-                break;
-            case '\\':
-                ret += "\\\\";
-                break;
-            default:
-                ret += ch;
-                break;
-            }
-        }
-        return ret;
-    }
-
 }
 
 std::string JSON::stringify_unit(std::string indent, size_t indent_cnt, bool hide_raw) const
