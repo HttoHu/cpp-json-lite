@@ -1,5 +1,7 @@
 # cpp-json-lite
-A simple json parser on C++ supports UTF8
+A simple json parser on C++ 
+
+supports UTF-8 encoding 
 
 ## C++ Standard
 C++ 11 or later is required.
@@ -110,9 +112,8 @@ example
 
 
 #### Extend grammar
-If you want to append some raw-bytes (like pictures or some binary files), you can build your json as follows.
-
-(byte-length)$raw_contenst$
+If you want to append some raw data (like pictures or some binary files), you can build your json as follows.
+(raw-length)$raw_contenst$
 
 ```json
 {
