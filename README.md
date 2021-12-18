@@ -1,5 +1,5 @@
 # cpp-json-lite
-A simple json parser on C++
+A simple json parser on C++ supports UTF8
 
 ## C++ Standard
 C++ 11 or later is required.
