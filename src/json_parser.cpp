@@ -233,8 +233,8 @@ namespace Parser
     {
     public:
         Node(NodeType nt);
-        int get_int();
-        std::string get_str();
+        int64_t& get_int();
+        std::string& get_str();
         std::vector<unsigned char> &get_raw();
         Node *at(const std::string &str)
         {
@@ -259,8 +259,8 @@ namespace Parser
     public:
         Unit(const std::string &str) : Node(STRING), is_number(false), text(str) {}
         Unit(int64_t v) : Node(INT), is_number(true), integer(v) {}
-        static int64_t get_integer(Node *node);
-        static std::string get_str(Node *node);
+        static int64_t& get_integer(Node *node);
+        static std::string& get_str(Node *node);
         ~Unit(){};
 
     private:
@@ -333,6 +333,15 @@ namespace Lexer
         }
         i--;
         return v;
+    }
+    std::string get_word(const std::string &str, int &i)
+    {
+        int sp = i;
+        int len = 0;
+        while (i < str.size() && isalpha(str[i]))
+            i++, len++;
+        i--;
+        return str.substr(sp, len);
     }
     RawData *get_raw_data(const std::string &str, int &i)
     {
@@ -450,6 +459,22 @@ namespace Lexer
                 token_stream->push(new EndLine());
                 break;
             default:
+                if (isalpha(ch))
+                {
+                    std::string word = get_word(str, i);
+                    if (word == "null" || word == "false")
+                    {
+                        token_stream->push(new Integer(0));
+                    }
+                    else if (word == "true")
+                    {
+                        token_stream->push(new Integer(1));
+                    }
+                    else
+                    {
+                        throw std::runtime_error("unexcepted word: " + word);
+                    }
+                }
                 break;
             }
         }
@@ -461,7 +486,7 @@ namespace Parser
 {
     // Node
     Node::Node(NodeType nt) : type(nt) {}
-    int Node::get_int()
+    int64_t& Node::get_int()
     {
         if (type == INT)
         {
@@ -481,7 +506,7 @@ namespace Parser
             throw std::runtime_error("type not matched excepted a bytes");
         }
     }
-    std::string Node::get_str()
+    std::string& Node::get_str()
     {
         if (type == STRING)
         {
@@ -506,11 +531,11 @@ namespace Parser
     }
     Node::~Node() {}
     // Unit
-    int64_t Unit::get_integer(Node *node)
+    int64_t& Unit::get_integer(Node *node)
     {
         return static_cast<Unit *>(node)->integer;
     }
-    std::string Unit::get_str(Node *node)
+    std::string& Unit::get_str(Node *node)
     {
         return static_cast<Unit *>(node)->text;
     }
@@ -674,11 +699,11 @@ JSON::JSONTYPE JSON::get_type() const
 {
     return (JSONTYPE)node->get_type();
 }
-int64_t JSON::get_int() const
+int64_t& JSON::get_int()const
 {
     return node->get_int();
 }
-std::string JSON::get_str() const
+std::string& JSON::get_str()const
 {
     return node->get_str();
 }

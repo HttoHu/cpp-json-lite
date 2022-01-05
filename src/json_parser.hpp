@@ -29,8 +29,8 @@ public:
 
     JSONTYPE get_type() const;
 
-    int64_t get_int() const;
-    std::string get_str() const;
+    int64_t& get_int()const;
+    std::string& get_str()const;
     std::vector<unsigned char> &get_raw() const;
 
     std::map<std::string, JSON> get_map() const;
