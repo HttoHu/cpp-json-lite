@@ -15,8 +15,15 @@ namespace
         {
             switch (ch)
             {
+            case '\"':
+                ret+="\\\"";
+                break;
+            case '\'':
+                ret+="\\\'";
+                break;
             case '\r':
                 ret += "\\r";
+                break;
             case '\n':
                 ret += "\\n";
                 break;
