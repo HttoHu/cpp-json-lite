@@ -77,7 +77,9 @@ namespace Lexer
 
     extern std::map<Tag, std::string> tag_to_string;
     extern std::map<std::string, Tag> string_to_tag;
-
+    std::map<char, std::string> escape_tab{
+        {'\"', "\\\""},
+        {'\\', "\\\\"}};
     class Token
     {
     public:
@@ -880,7 +882,15 @@ JSON JSON::val(int val)
 }
 JSON JSON::val(const std::string &str)
 {
-    return JSON("\"" + str + "\"");
+    std::string nstr;
+    for (auto ch : str)
+    {
+        if (Lexer::escape_tab.count(ch))
+            nstr += Lexer::escape_tab[ch];
+        else
+            nstr += ch;
+    }
+    return JSON("\"" + nstr + "\"");
 }
 JSON JSON::array(const std::vector<JSON> &vec)
 {
