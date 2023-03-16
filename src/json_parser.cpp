@@ -6,8 +6,11 @@
 #include <fstream>
 #include <cstring>
 #include "json_parser.hpp"
+
+// some utils functions
 namespace
 {
+    // convert string to literal
     std::string conv_str(const std::string &str)
     {
         std::string ret;
@@ -16,10 +19,10 @@ namespace
             switch (ch)
             {
             case '\"':
-                ret+="\\\"";
+                ret += "\\\"";
                 break;
             case '\'':
-                ret+="\\\'";
+                ret += "\\\'";
                 break;
             case '\r':
                 ret += "\\r";
@@ -40,6 +43,7 @@ namespace
         }
         return ret;
     }
+    // utf-8 char size
     int get_char_size(unsigned char ch)
     {
         unsigned char header = ch >> 4;
@@ -53,8 +57,32 @@ namespace
         }
         return len;
     }
+    // to parse a number from str+i
+    long long get_number(const std::string &str, int &i)
+    {
+        long long v = str[i] - '0';
+        i++;
+        while (i < str.size() && isdigit(str[i]))
+        {
+            v *= 10;
+            v += str[i] - '0';
+            i++;
+        }
+        i--;
+        return v;
+    }
+    // to parse a word or number
+    std::string get_word(const std::string &str, int &i)
+    {
+        int sp = i;
+        int len = 0;
+        while (i < str.size() && isalpha(str[i]))
+            i++, len++;
+        i--;
+        return str.substr(sp, len);
+    }
 }
-// interface
+// Lexer to scan the string and split them to tokens
 namespace Lexer
 {
     enum Tag
@@ -75,11 +103,26 @@ namespace Lexer
         END_TAG
     };
 
-    extern std::map<Tag, std::string> tag_to_string;
-    extern std::map<std::string, Tag> string_to_tag;
-    std::map<char, std::string> escape_tab{
-        {'\"', "\\\""},
-        {'\\', "\\\\"}};
+    static std::map<Tag, std::string> &tag_to_string()
+    {
+        static std::map<Tag, std::string> tab{
+            {BEGIN, "{"}, {END, "}"}, {LSB, "["}, {RSB, "]"}, {COMMA, ","}, {COLON, ":"}, {END_TAG, "EOF"}, {LPAR, "("}, {RPAR, ")"}, {DOLLAR, "$"}};
+        return tab;
+    }
+    static std::map<std::string, Tag> &string_to_tag()
+    {
+        static std::map<std::string, Tag> tab{
+            {"{", BEGIN}, {"}", END}, {"[", LSB}, {"]", RSB}, {",", COMMA}, {":", COLON}, {"(", LPAR}, {")", RPAR}, {"$", DOLLAR}};
+        return tab;
+    }
+    static std::map<char, std::string> &escape_tab()
+    {
+        static std::map<char, std::string> escape_tab{
+            {'\"', "\\\""},
+            {'\\', "\\\\"}};
+        return escape_tab;
+    }
+
     class Token
     {
     public:
@@ -87,9 +130,9 @@ namespace Lexer
         virtual ~Token() {}
         virtual std::string to_string() const
         {
-            if (tag_to_string.count(tag))
+            if (tag_to_string().count(tag))
             {
-                return tag_to_string[tag];
+                return tag_to_string()[tag];
             }
             else
                 throw std::runtime_error("Token::get_tag() unknown tag");
@@ -168,6 +211,7 @@ namespace Lexer
     private:
         std::vector<unsigned char> data;
     };
+
     class TokenStream
     {
     public:
@@ -223,135 +267,8 @@ namespace Lexer
         std::vector<Token *> tokens;
         int cur_p = 0;
     };
-
-    TokenStream *build_token_stream(const std::string &str);
-}
-namespace Parser
-{
-    // Header
-    // statement
-    enum NodeType
-    {
-        STRING = 1,
-        INT = 2,
-        ARRAY = 3,
-        GROUP = 4,
-        RAW = 5
-    };
-    class Node
-    {
-    public:
-        Node(NodeType nt);
-        int64_t& get_int();
-        std::string& get_str();
-        std::vector<unsigned char> &get_raw();
-        Node *at(const std::string &str)
-        {
-            return operator[](str);
-        }
-        Node *at(size_t idx)
-        {
-            return operator[](idx);
-        }
-        Node *operator[](const std::string &str);
-        Node *operator[](size_t idx);
-
-        NodeType get_type() const { return type; }
-        virtual ~Node();
-
-    private:
-        NodeType type;
-    };
-
-    class Unit : public Node
-    {
-    public:
-        Unit(const std::string &str) : Node(STRING), is_number(false), text(str) {}
-        Unit(int64_t v) : Node(INT), is_number(true), integer(v) {}
-        static int64_t& get_integer(Node *node);
-        static std::string& get_str(Node *node);
-        ~Unit(){};
-
-    private:
-        bool is_number;
-        std::string text;
-        int64_t integer;
-    };
-    class Group : public Node
-    {
-    public:
-        Group(const std::map<std::string, Node *> &tab);
-        Node *operator[](const std::string &str) const;
-        ~Group();
-        size_t count() const;
-
-    private:
-        friend class ::JSON;
-        std::map<std::string, Node *> member_table;
-    };
-    class Array : public Node
-    {
-    public:
-        Array(const std::vector<Node *> &ele);
-        Node *operator[](size_t idx) const;
-        ~Array();
-        size_t length() const;
-
-    private:
-        friend class ::JSON;
-        std::vector<Node *> elements;
-    };
-    // extend json. (length)$raw_data$
-    class Bytes : public Node
-    {
-    public:
-        Bytes(const std::vector<unsigned char> &tmp) : Node(RAW), data(tmp) {}
-        Bytes(std::vector<unsigned char> &&tmp) : Node(RAW), data(std::move(tmp)) {}
-        size_t raw_length() const
-        {
-            return data.size();
-        }
-        static std::vector<unsigned char> &get_bytes(Node *node)
-        {
-            return static_cast<Bytes *>(node)->data;
-        }
-
-    private:
-        std::vector<unsigned char> data;
-    };
-}
-// implementation
-namespace Lexer
-{
-
-    std::map<Tag, std::string> tag_to_string{
-        {BEGIN, "{"}, {END, "}"}, {LSB, "["}, {RSB, "]"}, {COMMA, ","}, {COLON, ":"}, {END_TAG, "EOF"}, {LPAR, "("}, {RPAR, ")"}, {DOLLAR, "$"}};
-
-    std::map<std::string, Tag> string_to_tag{
-        {"{", BEGIN}, {"}", END}, {"[", LSB}, {"]", RSB}, {",", COMMA}, {":", COLON}, {"(", LPAR}, {")", RPAR}, {"$", DOLLAR}};
-    // number or string
-    long long get_number(const std::string &str, int &i)
-    {
-        long long v = str[i] - '0';
-        i++;
-        while (i < str.size() && isdigit(str[i]))
-        {
-            v *= 10;
-            v += str[i] - '0';
-            i++;
-        }
-        i--;
-        return v;
-    }
-    std::string get_word(const std::string &str, int &i)
-    {
-        int sp = i;
-        int len = 0;
-        while (i < str.size() && isalpha(str[i]))
-            i++, len++;
-        i--;
-        return str.substr(sp, len);
-    }
+    
+    // cpp json lite supports insert raw binary data to the json
     RawData *get_raw_data(const std::string &str, int &i)
     {
         // skip (
@@ -381,6 +298,7 @@ namespace Lexer
             throw std::runtime_error("invalid raw_data format may be loss right $!");
         return new RawData(std::move(vec));
     }
+
     TokenStream *build_token_stream(const std::string &str)
     {
         TokenStream *token_stream = new TokenStream();
@@ -461,7 +379,7 @@ namespace Lexer
             case '}':
             case ':':
             case ',':
-                token_stream->push(new Token(string_to_tag[std::string(1, ch)]));
+                token_stream->push(new Token(string_to_tag()[std::string(1, ch)]));
                 break;
             case '\r':
             case '\n':
@@ -490,12 +408,106 @@ namespace Lexer
         token_stream->push(new Token(END_TAG));
         return token_stream;
     }
+
 }
 namespace Parser
 {
-    // Node
-    Node::Node(NodeType nt) : type(nt) {}
-    int64_t& Node::get_int()
+    // Header
+    // statement
+    enum NodeType
+    {
+        STRING = 1,
+        INT = 2,
+        ARRAY = 3,
+        GROUP = 4,
+        RAW = 5
+    };
+    class Node
+    {
+    public:
+        Node(NodeType nt) : type(nt) {}
+        int64_t &get_int();
+        std::string &get_str();
+        std::vector<unsigned char> &get_raw();
+        Node *at(const std::string &str)
+        {
+            return operator[](str);
+        }
+        Node *at(size_t idx)
+        {
+            return operator[](idx);
+        }
+        Node *operator[](const std::string &str);
+        Node *operator[](size_t idx);
+
+        NodeType get_type() const { return type; }
+        virtual ~Node();
+
+    private:
+        NodeType type;
+    };
+
+    class Unit : public Node
+    {
+    public:
+        Unit(const std::string &str) : Node(STRING), is_number(false), text(str) {}
+        Unit(int64_t v) : Node(INT), is_number(true), integer(v) {}
+        static int64_t &get_integer(Node *node);
+        static std::string &get_str(Node *node);
+        ~Unit(){};
+
+    private:
+        bool is_number;
+        std::string text;
+        int64_t integer;
+    };
+    class Group : public Node
+    {
+    public:
+        Group(const std::map<std::string, Node *> &tab);
+        Node *operator[](const std::string &str) const;
+        ~Group();
+        size_t count() const;
+
+    private:
+        friend class ::JSON;
+        std::map<std::string, Node *> member_table;
+    };
+    class Array : public Node
+    {
+    public:
+        Array(const std::vector<Node *> &ele);
+        Node *operator[](size_t idx) const;
+        ~Array();
+        size_t length() const;
+
+    private:
+        friend class ::JSON;
+        std::vector<Node *> elements;
+    };
+    // extend json. (length)$raw_data$
+    class Bytes : public Node
+    {
+    public:
+        Bytes(const std::vector<unsigned char> &tmp) : Node(RAW), data(tmp) {}
+        Bytes(std::vector<unsigned char> &&tmp) : Node(RAW), data(std::move(tmp)) {}
+        size_t raw_length() const
+        {
+            return data.size();
+        }
+        static std::vector<unsigned char> &get_bytes(Node *node)
+        {
+            return static_cast<Bytes *>(node)->data;
+        }
+
+    private:
+        std::vector<unsigned char> data;
+    };
+}
+
+namespace Parser
+{
+    int64_t &Node::get_int()
     {
         if (type == INT)
         {
@@ -515,7 +527,7 @@ namespace Parser
             throw std::runtime_error("type not matched excepted a bytes");
         }
     }
-    std::string& Node::get_str()
+    std::string &Node::get_str()
     {
         if (type == STRING)
         {
@@ -540,11 +552,11 @@ namespace Parser
     }
     Node::~Node() {}
     // Unit
-    int64_t& Unit::get_integer(Node *node)
+    int64_t &Unit::get_integer(Node *node)
     {
         return static_cast<Unit *>(node)->integer;
     }
-    std::string& Unit::get_str(Node *node)
+    std::string &Unit::get_str(Node *node)
     {
         return static_cast<Unit *>(node)->text;
     }
@@ -565,7 +577,7 @@ namespace Parser
     {
         return elements.size();
     }
-    //Group
+    // Group
     Group::Group(const std::map<std::string, Node *> &tab) : Node(GROUP), member_table(tab) {}
     Node *Group::operator[](const std::string &str) const
     {
@@ -708,11 +720,11 @@ JSON::JSONTYPE JSON::get_type() const
 {
     return (JSONTYPE)node->get_type();
 }
-int64_t& JSON::get_int()const
+int64_t &JSON::get_int() const
 {
     return node->get_int();
 }
-std::string& JSON::get_str()const
+std::string &JSON::get_str() const
 {
     return node->get_str();
 }
@@ -885,16 +897,17 @@ JSON JSON::val(const std::string &str)
     std::string nstr;
     for (auto ch : str)
     {
-        if (Lexer::escape_tab.count(ch))
-            nstr += Lexer::escape_tab[ch];
+        if (Lexer::escape_tab().count(ch))
+            nstr += Lexer::escape_tab()[ch];
         else
             nstr += ch;
     }
     return JSON("\"" + nstr + "\"");
 }
+
 JSON JSON::array(const std::vector<JSON> &vec)
 {
-    //vector<JSON> -> vector<Node*>
+    // vector<JSON> -> vector<Node*>
     std::vector<Parser::Node *> tmp;
     for (auto item : vec)
     {
@@ -904,9 +917,10 @@ JSON JSON::array(const std::vector<JSON> &vec)
     Parser::Array *node = new Parser::Array(tmp);
     return JSON(false, node);
 }
+
 JSON JSON::map(const std::map<std::string, JSON> &table)
 {
-    //vector<JSON> -> vector<Node*>
+    // vector<JSON> -> vector<Node*>
     std::map<std::string, Parser::Node *> tmp;
     for (auto item : table)
     {
@@ -916,6 +930,7 @@ JSON JSON::map(const std::map<std::string, JSON> &table)
     Parser::Group *node = new Parser::Group(tmp);
     return JSON(false, node);
 }
+
 JSON JSON::read_from_file(const std::string &filename)
 {
     std::ifstream ifs(filename, std::ios::in | std::ios::binary);
