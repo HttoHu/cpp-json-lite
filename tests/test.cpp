@@ -36,9 +36,18 @@ void test_unicode()
   CHECK_EQ(JSON(R"("hello \u5730 world\\")").get_str(), "hello \u5730 world\\");
 }
 
+void test_escape()
+{
+  std::cout << "Running test: lexer test: test_escape\n";
+  CHECK_EQ(JSON(R"("''")").to_string(), "\"''\"");
+  CHECK_EQ(JSON(R"("\b\n\r\f\r\t")").to_string(), "\"\\b\\n\\r\\f\\r\\t\"");
+}
+
 int main()
 {
   test_unicode();
+  test_escape();
+
   std::cout << "==============================================\n";
   std::cout << "total assert: " << tot_assert << "\n";
   std::cout << "success assert: " << tot_assert - failed_assert_cnt << "\n";

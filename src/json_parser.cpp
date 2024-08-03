@@ -20,11 +20,14 @@ namespace
         {
             switch (ch)
             {
+            case '\b':
+                ret += "\\b";
+                break;
+            case '\f':
+                ret += "\\f";
+                break;
             case '\"':
                 ret += "\\\"";
-                break;
-            case '\'':
-                ret += "\\\'";
                 break;
             case '\r':
                 ret += "\\r";
@@ -352,7 +355,7 @@ namespace Lexer
                                 // convert unicode to UTF8
                                 std::wstring wstr;
                                 wstr.push_back(encoding);
-                                std::wstring_convert< std::codecvt_utf8<wchar_t> > wcv;
+                                std::wstring_convert<std::codecvt_utf8<wchar_t>> wcv;
                                 auto utf_bytes = wcv.to_bytes(wstr);
                                 v.append(wcv.to_bytes(wstr));
                                 i += 4;
@@ -367,8 +370,13 @@ namespace Lexer
                             case 't':
                                 v += '\t';
                                 break;
+                            case 'b':
+                                v += '\b';
+                                break;
+                            case 'f':
+                                v += '\f';
+                                break;
                             case '\\':
-
                             case '\"':
                             case '\'':
                                 v += str[i];
@@ -481,7 +489,7 @@ namespace Parser
         Unit(int64_t v) : Node(INT), is_number(true), integer(v) {}
         static int64_t &get_integer(Node *node);
         static std::string &get_str(Node *node);
-        ~Unit(){};
+        ~Unit() {};
 
     private:
         bool is_number;
