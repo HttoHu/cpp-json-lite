@@ -1,14 +1,16 @@
 # cpp-json-lite
 A simple json parser on C++ 
 
-supports UTF-8 encoding 
+supports UTF-8 encoding
+
+`bash_test.sh` to build test_cases, the unittest only contains regressions test
 
 ## C++ Standard
 C++ 11 or later is required.
 
 ## Usage
 
-**Be careful when copying a JSON object, because when you copy A to B, A should no longer be used**
+**Be careful when copying a JSON object, because when you copy A to B, A should no longer be used (like be moved, TODO: using move semantics, disable copy construction and assignment)**
 ```cpp
 JSON A=B; 
 A.add_pair("GOOD",B); // BOOM!!!! The node object inside has been deleted twice

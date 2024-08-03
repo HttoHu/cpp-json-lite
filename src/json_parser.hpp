@@ -3,6 +3,8 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <cinttypes>
+
 namespace Parser
 {
     class Node;

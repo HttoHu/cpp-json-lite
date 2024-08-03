@@ -6,6 +6,8 @@
 #include <fstream>
 #include <cstring>
 #include "json_parser.hpp"
+#include <codecvt>
+#include <locale>
 
 // some utils functions
 namespace
@@ -267,7 +269,7 @@ namespace Lexer
         std::vector<Token *> tokens;
         int cur_p = 0;
     };
-    
+
     // cpp json lite supports insert raw binary data to the json
     RawData *get_raw_data(const std::string &str, int &i)
     {
@@ -332,6 +334,30 @@ namespace Lexer
                             i++;
                             switch (str[i])
                             {
+                            case 'u':
+                            {
+                                // to support unicode encoding
+                                if (i + 4 >= str.size())
+                                    throw std::runtime_error("build_token_stream: invalid string illegae unicode escape");
+                                uint16_t encoding = 0;
+                                for (int k = 1; k <= 4; k++)
+                                {
+                                    uint8_t c = 0;
+                                    if (isdigit(str[i + k]))
+                                        c = str[i + k] - '0';
+                                    else
+                                        c = toupper(str[i + k]) - 'A' + 10;
+                                    encoding = (encoding << 4) + c;
+                                }
+                                // convert unicode to UTF8
+                                std::wstring wstr;
+                                wstr.push_back(encoding);
+                                std::wstring_convert< std::codecvt_utf8<wchar_t> > wcv;
+                                auto utf_bytes = wcv.to_bytes(wstr);
+                                v.append(wcv.to_bytes(wstr));
+                                i += 4;
+                                break;
+                            }
                             case 'r':
                                 v += '\r';
                                 break;
@@ -342,12 +368,13 @@ namespace Lexer
                                 v += '\t';
                                 break;
                             case '\\':
+
                             case '\"':
                             case '\'':
                                 v += str[i];
                                 break;
                             default:
-                                throw std::runtime_error("build_token_stream: invalid string");
+                                throw std::runtime_error("build_token_stream: invalid string, unknown escape char ASCII(dec)" + std::to_string(unsigned(str[i])));
                             }
                         }
                         else
