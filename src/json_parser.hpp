@@ -34,8 +34,8 @@ public:
     int64_t& get_int()const;
     std::string& get_str()const;
     std::vector<unsigned char> &get_raw() const;
-
     std::map<std::string, JSON> get_map() const;
+    bool contains(const std::string &key)const;
     std::vector<JSON> get_list() const;
 
     JSON operator[](const std::string &str);

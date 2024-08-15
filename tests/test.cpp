@@ -8,7 +8,7 @@ void CHECK_EQ(T a, U b)
   tot_assert++;
   if (a != b)
   {
-    std::cerr << "\tCHECK failed, \"" << a << "\" not equal to \"" << b << "\"" << std::endl;
+    std::cerr << "\tCHECKEQ failed, \"" << a << "\" not equal to \"" << b << "\"" << std::endl;
     failed_assert_cnt++;
     return;
   }
@@ -19,7 +19,7 @@ void CHECK_NE(T a, U b)
   tot_assert++;
   if (a == b)
   {
-    std::cerr << "\tCHECK failed, \"" << a << "\" not equal to \"" << b << "\"" << std::endl;
+    std::cerr << "\tCHECKEQ failed, \"" << a << "\" equal to \"" << b << "\"" << std::endl;
     failed_assert_cnt++;
     return;
   }
@@ -40,14 +40,28 @@ void test_escape()
 {
   std::cout << "Running test: lexer test: test_escape\n";
   CHECK_EQ(JSON(R"("''")").to_string(), "\"''\"");
+  // https://www.json.org/json-en.html, b f r n t u
   CHECK_EQ(JSON(R"("\b\n\r\f\r\t")").to_string(), "\"\\b\\n\\r\\f\\r\\t\"");
+}
+
+void test_map()
+{
+  std::cout << "Running test: Map test" << std::endl;
+
+  auto json = JSON(R"({"a":123,"b":"2345","c":[1,2,3]})");
+  CHECK_EQ(json.contains("a"), true);
+  CHECK_EQ(json.contains("b"), true);
+  CHECK_EQ(json.contains("c"), true);
+  CHECK_NE(json.contains("d"), true);
+  CHECK_NE(json["c"].contains("a"), true);
+  CHECK_EQ(json["c"][2].get_int(), 3);
 }
 
 int main()
 {
   test_unicode();
   test_escape();
-
+  test_map();
   std::cout << "==============================================\n";
   std::cout << "total assert: " << tot_assert << "\n";
   std::cout << "success assert: " << tot_assert - failed_assert_cnt << "\n";

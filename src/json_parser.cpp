@@ -575,7 +575,7 @@ namespace Parser
     {
         if (type != GROUP)
         {
-            throw std::runtime_error("type not matched, expected an array!");
+            throw std::runtime_error("type not matched, expected an group!");
         }
         return static_cast<Group *>(this)->operator[](str);
     }
@@ -767,6 +767,14 @@ std::vector<unsigned char> &JSON::get_raw() const
 {
     return node->get_raw();
 }
+
+bool JSON::contains(const std::string &key) const
+{
+    if (node->get_type() != Parser::GROUP)
+        return false;
+    return static_cast<Parser::Group *>(node)->member_table.count(key);
+}
+
 std::map<std::string, JSON> JSON::get_map() const
 {
     if (node->get_type() != Parser::GROUP)
